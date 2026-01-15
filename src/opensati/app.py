@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 import customtkinter as ctk
 
 from opensati.config.settings import Settings, get_settings
+from opensati.core.activity import ActivityMonitor
 from opensati.core.detector import StressDetector, StressLevel
 from opensati.core.vision import ScreenCapture
 from opensati.interventions.decompression import DecompressionScreen
@@ -43,6 +44,7 @@ class OpenSatiApp:
     # AI components (optional)
     _intent_checker = None
     _screen_capture: ScreenCapture | None = None
+    _activity_monitor: ActivityMonitor | None = None
 
     # State
     _running: bool = False
@@ -97,6 +99,12 @@ class OpenSatiApp:
             # Initialize screen capture
             self._screen_capture = ScreenCapture(capture_interval=15.0)
             print("🖥️ Screen analysis enabled")
+        
+        # Initialize activity monitor
+        self._activity_monitor = ActivityMonitor(on_log=self._log)
+        
+        # Auto-setup Ollama if needed
+        self._setup_ollama()
 
     def _setup_intent_checker(self) -> None:
         """Set up optional intent checking."""
@@ -109,6 +117,24 @@ class OpenSatiApp:
             )
         except ImportError:
             print("⚠️ Intent checker not available")
+
+    def _setup_ollama(self) -> None:
+        """Auto-setup Ollama if not installed."""
+        try:
+            from opensati.ai.ollama_setup import OllamaSetup
+            
+            setup = OllamaSetup(on_log=self._log)
+            
+            if not setup.is_installed():
+                self._log("📦 Ollama not found, attempting install...")
+                setup.install()
+            
+            # Ensure server is running
+            if setup.is_installed() and not setup.is_running():
+                setup.start_server()
+                
+        except Exception as e:
+            print(f"⚠️ Ollama setup skipped: {e}")
 
     def run(self) -> None:
         """Run the application."""
@@ -186,6 +212,10 @@ class OpenSatiApp:
             # Set default intent to enable immediate analysis
             self._intent_checker.set_intent("General Productivity")
             self._log("🎯 Default goal set: General Productivity")
+
+        # Start activity monitor
+        if self._activity_monitor:
+            self._activity_monitor.start()
 
         # Start system tray
         if self._tray:
@@ -267,6 +297,10 @@ class OpenSatiApp:
             # Check intent if enabled
             if self._intent_checker:
                 self._intent_checker.check()
+            
+            # Check activity (logs app switches automatically)
+            if self._activity_monitor:
+                self._activity_monitor.check()
 
     def _on_stress_detected(self, level: StressLevel, score: float) -> None:
         """Handle stress detection."""
