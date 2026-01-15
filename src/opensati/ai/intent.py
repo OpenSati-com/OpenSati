@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import threading
 import time
-from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from opensati.ai.ollama_client import OllamaClient
 from opensati.config.settings import get_settings

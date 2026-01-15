@@ -3,7 +3,7 @@
 import tempfile
 from pathlib import Path
 
-from opensati.config.settings import Settings, SensorConfig, DetectionConfig
+from opensati.config.settings import Settings
 
 
 class TestSettings:

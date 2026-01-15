@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import sys
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
-
-import customtkinter as ctk
 
 
 @dataclass

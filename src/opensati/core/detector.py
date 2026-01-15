@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 from opensati.config.settings import Settings, get_settings
-from opensati.core.sensors import InputSensor, SensorState
+from opensati.core.sensors import InputSensor
 
 
 class StressLevel(Enum):

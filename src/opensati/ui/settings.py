@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import customtkinter as ctk
 
-from opensati.config.settings import Settings, get_settings, reload_settings
+from opensati.config.settings import Settings, get_settings
 
 
 @dataclass

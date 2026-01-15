@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from opensati.config.settings import get_settings
 
@@ -149,7 +148,7 @@ Answer with:
 
 Format: YES/NO: explanation"""
 
-        system = """You are a focus assistant. Be lenient - if the content could 
+        system = """You are a focus assistant. Be lenient - if the content could
 reasonably be related to work (research, documentation, tutorials), say YES.
 Only say NO for obvious distractions like social media, games, or unrelated videos."""
 

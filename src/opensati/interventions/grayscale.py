@@ -47,20 +47,13 @@ class GrayscaleEffect:
 
     def _apply_macos(self, level: float) -> bool:
         """Apply saturation on macOS using ColorSync."""
-        import subprocess
 
         # Use AppleScript to toggle grayscale
         # macOS doesn't have fine-grained saturation control via API
         # So we use the Accessibility grayscale toggle
         if level < 0.5:
             # Enable grayscale
-            script = '''
-            tell application "System Events"
-                tell application process "System Preferences"
-                    -- Note: This requires Accessibility permissions
-                end tell
-            end tell
-            '''
+            # Note: Full grayscale on macOS requires Accessibility permissions
             # For now, we'll use the gamma approach as fallback
             pass
 
@@ -72,7 +65,6 @@ class GrayscaleEffect:
         """Apply saturation on Windows using MagSetFullscreenColorEffect."""
         try:
             import ctypes
-            from ctypes import wintypes
 
             # Use Windows Magnification API for color effects
             # Requires magnification.dll

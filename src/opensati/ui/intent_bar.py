@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 import customtkinter as ctk
 
@@ -126,8 +126,8 @@ class IntentBar:
         if not self._window:
             return
 
-        import time
         import threading
+        import time
 
         def fade():
             for i in range(10):

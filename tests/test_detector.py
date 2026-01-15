@@ -1,11 +1,9 @@
 """Tests for stress detector."""
 
-import time
 
-import pytest
 
-from opensati.core.detector import StressDetector, StressLevel
 from opensati.config.settings import Settings
+from opensati.core.detector import StressDetector, StressLevel
 
 
 class TestStressDetector:
