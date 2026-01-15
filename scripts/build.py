@@ -14,6 +14,13 @@ from pathlib import Path
 
 def main():
     """Build standalone executable."""
+    # Force UTF-8 output for Windows Unicode support
+    if sys.stdout.encoding.lower() != 'utf-8':
+        try:
+             sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass  # Fallback if reconfigure fails
+
     print("\n🔨 Building OpenSati Standalone Executable")
     print("=" * 50)
 
