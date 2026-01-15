@@ -1,0 +1,5 @@
+# OpenSati Audio Dependencies
+# Install with: pip install -r requirements-audio.txt
+
+pyaudio>=0.2.14
+scipy>=1.11.0

@@ -1,0 +1,1 @@
+"""OpenSati test module."""
