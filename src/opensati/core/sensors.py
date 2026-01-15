@@ -62,6 +62,7 @@ class InputSensor:
     _running: bool = False
     _keyboard_listener: keyboard.Listener | None = None  # type: ignore
     _mouse_listener: mouse.Listener | None = None  # type: ignore
+    _mac_monitor: object | None = None
     _start_time: float = 0.0
 
     def __post_init__(self) -> None:
@@ -77,33 +78,31 @@ class InputSensor:
         if self._running:
             return
 
+        import platform
+        if platform.system() == "Darwin":
+            try:
+                from opensati.core.mac_input import MacInputMonitor
+                self._mac_monitor = MacInputMonitor(window_size=self.window_size)
+                if self._mac_monitor.start():
+                    self._running = True
+                    self._start_time = time.time()
+                    print("🎹 Input sensors started (Quartz mode - safe)")
+                    return
+            except Exception as e:
+                print(f"⚠️ Mac Quartz monitor failed: {e}")
+                # Fallback to pynput if Quartz fails, but it usually works
+        
+        # Non-macOS or fallback logic
         if not _pynput_available:
             print("⚠️ pynput not available (headless environment?)")
             return
 
-        # macOS Safety Check: Prevent crash by checking permissions/API first
-        import platform
-        if platform.system() == "Darwin":
-            try:
-                from ApplicationServices import AXIsProcessTrusted
-                # This access triggers the KeyError if pyobjc is broken
-                # and returns False if permissions are missing
-                if not AXIsProcessTrusted():
-                    print("⚠️ Accessibility permissions missing for input monitoring.")
-                    print("   Continuing with sensors disabled (grant access in System Settings to enable).")
-                    self._running = True
-                    return
-            except Exception as e:
-                print(f"⚠️ macOS Input Check Failed: {e}")
-                print("   Disabling input sensors to prevent crash.")
-                self._running = True
-                return
-
         self._running = True
         self._start_time = time.time()
 
+        # Try to start listeners
         try:
-            # Start keyboard listener (captures timing only, NOT keys)
+            # Start keyboard listener
             self._keyboard_listener = keyboard.Listener(on_press=self._on_key_press)
             self._keyboard_listener.start()
 
@@ -112,21 +111,20 @@ class InputSensor:
                 on_click=self._on_mouse_click, on_move=self._on_mouse_move
             )
             self._mouse_listener.start()
+            print("🎹 Input sensors started (pynput mode)")
 
-            print("🎹 Input sensors started (velocity only - no content logging)")
-            
         except Exception as e:
-            print(f"⚠️ Input monitoring failed to start: {e}")
-            print("   (This is common on macOS if Permissions are missing or PyObjC versions conflict)")
-            print("   Continuing with input sensors disabled...")
+            print(f"⚠️ Input monitoring failed: {e}")
             self._keyboard_listener = None
             self._mouse_listener = None
-
-        print("🎹 Input sensors started (velocity only - no content logging)")
 
     def stop(self) -> None:
         """Stop monitoring."""
         self._running = False
+        
+        if self._mac_monitor:
+            self._mac_monitor.stop()
+            self._mac_monitor = None
 
         if self._keyboard_listener:
             self._keyboard_listener.stop()
@@ -156,6 +154,20 @@ class InputSensor:
 
     def get_state(self) -> SensorState:
         """Get current sensor state."""
+        # Use Mac monitor if active
+        if self._mac_monitor:
+            intensity = self._mac_monitor.get_intensity()
+            # Map intensity (0-100) roughly to stress score
+            # Mac monitor aggregates all events, so we use simplified metrics
+            return SensorState(
+                keystrokes_per_second=0, # Detail not available in aggregated mode
+                mouse_clicks_per_second=0,
+                mouse_distance_per_second=0,
+                current_stress_score=intensity,
+                baseline_typing_speed=0,
+                is_calibrating=False
+            )
+
         now = time.time()
         window_start = now - self.window_size
         is_calibrating = (now - self._start_time) < self.baseline_duration

@@ -11,6 +11,7 @@ import customtkinter as ctk
 
 from opensati.config.settings import Settings, get_settings
 from opensati.core.detector import StressDetector, StressLevel
+from opensati.core.vision import ScreenCapture
 from opensati.interventions.decompression import DecompressionScreen
 from opensati.interventions.grayscale import GrayscaleEffect
 from opensati.interventions.overlay import NotificationOverlay
@@ -41,6 +42,7 @@ class OpenSatiApp:
 
     # AI components (optional)
     _intent_checker = None
+    _screen_capture: ScreenCapture | None = None
 
     # State
     _running: bool = False
@@ -92,6 +94,9 @@ class OpenSatiApp:
         # Set up intent checker if screen analysis enabled
         if self.settings.sensors.screen:
             self._setup_intent_checker()
+            # Initialize screen capture
+            self._screen_capture = ScreenCapture(capture_interval=15.0)
+            print("🖥️ Screen analysis enabled")
 
     def _setup_intent_checker(self) -> None:
         """Set up optional intent checking."""
@@ -100,6 +105,7 @@ class OpenSatiApp:
 
             self._intent_checker = IntentChecker(
                 on_mismatch_detected=self._on_intent_mismatch,
+                on_log=self._log,
             )
         except ImportError:
             print("⚠️ Intent checker not available")
@@ -122,11 +128,45 @@ class OpenSatiApp:
         # Start components
         self._start()
 
+        # Fallback: If tray failed to start (e.g. macOS), use Floating Widget
+        if self._tray and not self._tray._running:
+            print("ℹ️ Tray disabled - switching to Floating Widget mode")
+            
+            from opensati.ui.widget import FloatingWidget
+            
+            # Use the root window as the floating widget
+            self._root.deiconify()
+            self._widget = FloatingWidget(
+                self._root,
+                on_click=self._show_settings,
+                on_right_click=self._show_context_menu
+            )
+            
+            # Ensure quitting works via right-click or other means
+            # We don't have a taskbar icon, so user relies on the widget
+
         # Run main loop
         try:
             self._root.mainloop()
         except KeyboardInterrupt:
             self._quit()
+
+    def _show_context_menu(self, event=None):
+        """Handle right click on widget (Toggle Pause)."""
+        # Reuse tray logic to toggle pause state
+        if self._tray:
+            # This toggles boolean, calls callback, and tries to update icon (fails safely)
+            self._tray._toggle_pause()
+
+    def _update_widget_state(self, state: str) -> None:
+        """Update floating widget appearance."""
+        if hasattr(self, "_widget"):
+            self._widget.set_status(state)
+
+    def _log(self, message: str) -> None:
+        """Log message to widget if available."""
+        if hasattr(self, "_widget"):
+            self._widget.log(message)
 
     def _start(self) -> None:
         """Start monitoring and UI."""
@@ -143,6 +183,9 @@ class OpenSatiApp:
         # Start intent checker if enabled
         if self._intent_checker and self.settings.sensors.screen:
             self._intent_checker.start()
+            # Set default intent to enable immediate analysis
+            self._intent_checker.set_intent("General Productivity")
+            self._log("🎯 Default goal set: General Productivity")
 
         # Start system tray
         if self._tray:
@@ -157,18 +200,68 @@ class OpenSatiApp:
         print("✅ OpenSati running. Access settings from the system tray.")
 
     def _monitor_loop(self) -> None:
-        """Main monitoring loop."""
+        """Main monitoring loop with activity logging."""
         check_interval = 2.0  # Seconds
+        log_interval = 5.0    # Log every 5 seconds
+        last_log_time = 0
 
         while self._running:
             time.sleep(check_interval)
 
             # Skip if paused
             if self._tray and self._tray.is_paused:
+                self._log("⏸️ Monitoring paused...")
                 continue
 
-            # Check stress levels
+            # Get detector state and log periodically
             if self._detector:
+                state = self._detector.get_state()
+                current_time = time.time()
+                
+                # Log sensor data every log_interval seconds
+                if current_time - last_log_time >= log_interval:
+                    last_log_time = current_time
+                    
+                    # Check and log sensor status
+                    sensors_active = False
+                    
+                    # Log typing rate or show guidance
+                    if state.input_score > 0:
+                        self._log(f"⌨️ Typing: {state.input_score:.0f}% intensity")
+                        sensors_active = True
+                    elif self._detector._input_sensor and not self._detector._input_sensor._running:
+                        # Sensor exists but not running - needs permissions
+                        self._log("⚠️ Input sensors disabled - needs Accessibility permission")
+                    
+                    # Log breathing if available
+                    if state.breathing_score > 0:
+                        self._log(f"🫁 Breathing: {state.breathing_score:.0f}% stress")
+                        sensors_active = True
+                    
+                    # Log posture if available  
+                    if state.posture_score > 0:
+                        self._log(f"🪑 Posture: {state.posture_score:.0f}% tension")
+                        sensors_active = True
+                    
+                    # Log overall stress
+                    self._log(f"📊 Stress level: {state.score:.0f}/100 ({state.level.value})")
+
+                    # Screen analysis
+                    if hasattr(self, "_screen_capture") and self._screen_capture:
+                        # Periodically capture screen (every 3rd log cycle to save resources)
+                        if int(current_time) % 15 < 2:
+                            self._screen_capture.capture()
+                        
+                        screen_state = self._screen_capture.get_state()
+                        if screen_state.has_screenshot:
+                            self._log(f"🖥️ Screen: Active (Brightness: {screen_state.brightness:.1f})")
+                            sensors_active = True
+                    
+                    # Show guidance if no sensors active
+                    if not sensors_active and state.score == 0:
+                        self._log("💡 Add Terminal to: System Settings → Privacy → Accessibility")
+                
+                # Check and intervene
                 self._detector.check_and_intervene()
 
             # Check intent if enabled
@@ -182,6 +275,8 @@ class OpenSatiApp:
         # Update tray icon
         if self._tray:
             self._tray.set_state("stress")
+            
+        self._update_widget_state("stress")
 
         # Apply intervention based on style
         style = self.settings.intervention.style
@@ -206,6 +301,8 @@ class OpenSatiApp:
         # Update tray icon
         if self._tray:
             self._tray.set_state("active")
+            
+        self._update_widget_state("active")
 
     def _show_notification(self, message: str) -> None:
         """Show intervention notification (thread-safe)."""
@@ -223,6 +320,8 @@ class OpenSatiApp:
         # Update tray
         if self._tray:
             self._tray.set_state("flow")
+            
+        self._update_widget_state("flow")
 
     def _on_intervention_dismiss(self) -> None:
         """Handle user dismissing intervention."""
@@ -280,8 +379,10 @@ class OpenSatiApp:
         if self._tray:
             if self._tray.is_paused:
                 print("⏸️ Monitoring paused")
+                self._update_widget_state("paused")
             else:
                 print("▶️ Monitoring resumed")
+                self._update_widget_state("active")
 
     def _quit(self) -> None:
         """Quit the application."""

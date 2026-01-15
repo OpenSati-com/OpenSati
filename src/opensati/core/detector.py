@@ -89,7 +89,7 @@ class StressDetector:
         if self._input_sensor:
             sensor_state = self._input_sensor.get_state()
             input_score = sensor_state.current_stress_score
-
+        
         # Placeholder for other sensors (breathing, posture)
         # These would be integrated when those modules are enabled
         breathing_score = 0.0

@@ -38,6 +38,14 @@ class TrayIcon:
 
             # Create icon image
             icon_size = 64
+            
+            # macOS Limitation: running pystray in thread crashes with Tkinter
+            import platform
+            if platform.system() == "Darwin":
+                 print("⚠️ System Tray disabled on macOS (avoids conflict with Settings UI).")
+                 print("   The Settings window will open instead.")
+                 return False
+
             image = Image.new("RGBA", (icon_size, icon_size), (0, 0, 0, 0))
             draw = ImageDraw.Draw(image)
 

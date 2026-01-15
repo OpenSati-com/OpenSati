@@ -36,7 +36,7 @@ class SensorConfig:
 
     keyboard: bool = True
     mouse: bool = True
-    screen: bool = False
+    screen: bool = True
     webcam: bool = False
     microphone: bool = False
 

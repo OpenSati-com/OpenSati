@@ -40,6 +40,7 @@ class IntentChecker:
 
     # Callbacks
     on_mismatch_detected: Callable[[str, str], None] | None = None
+    on_log: Callable[[str], None] | None = None
 
     # Internal state
     _current_intent: str = ""
@@ -93,7 +94,13 @@ class IntentChecker:
 
         Returns current state.
         """
-        if not self._running or not self._current_intent:
+        if not self._running:
+            return IntentState(is_enabled=False)
+            
+        if not self._current_intent:
+            # Periodically remind user to set intent (every 5 mins)
+            if self.on_log and int(time.time()) % 300 == 0:
+                 self.on_log("💡 Set a Goal in Settings to enable AI analysis")
             return IntentState(is_enabled=False)
 
         now = time.time()
@@ -116,19 +123,32 @@ class IntentChecker:
         self._last_check = now
 
         # Capture screen
+        if self.on_log:
+            self.on_log("📸 Capturing screen for analysis...")
+            
         self._screen_capture.capture()
         image_bytes = self._screen_capture.get_for_ai()
 
         if not image_bytes:
+            if self.on_log:
+                self.on_log("⚠️ Screen capture returned empty")
             return IntentState(
                 current_intent=self._current_intent,
                 is_enabled=True,
             )
 
         # Check with AI
+        if self.on_log:
+            self.on_log(f"🤖 Analyzing with {self._ollama.model_name}...")
+            
         matches, explanation = self._ollama.check_intent_match(
             self._current_intent, image_bytes
         )
+        
+        # Log result
+        if self.on_log:
+            status = "✅ On Task" if matches else "❌ Distracted"
+            self.on_log(f"{status}: {explanation[:50]}...")
 
         # Clear screenshot from memory
         self._screen_capture.clear()
