@@ -1,9 +1,16 @@
 """Tests for stress detector."""
 
-
+import pytest
 
 from opensati.config.settings import Settings
 from opensati.core.detector import StressDetector, StressLevel
+from opensati.core.sensors import is_pynput_available
+
+# Skip tests that require display if pynput is not available
+requires_display = pytest.mark.skipif(
+    not is_pynput_available(),
+    reason="pynput requires display (headless environment)",
+)
 
 
 class TestStressDetector:
@@ -52,6 +59,7 @@ class TestPrivacy:
         assert not hasattr(state, "keystroke_content")
         assert not hasattr(state, "keys_pressed")
 
+    @requires_display
     def test_screenshot_not_stored(self):
         """Screenshots should only exist in RAM."""
         from opensati.core.vision import ScreenCapture

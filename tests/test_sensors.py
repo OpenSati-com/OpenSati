@@ -1,7 +1,14 @@
 """Tests for sensor modules."""
 
+import pytest
 
-from opensati.core.sensors import InputSensor, SensorState
+from opensati.core.sensors import InputSensor, SensorState, is_pynput_available
+
+# Skip tests that require display if pynput is not available
+requires_display = pytest.mark.skipif(
+    not is_pynput_available(),
+    reason="pynput requires display (headless environment)",
+)
 
 
 class TestInputSensor:
@@ -39,6 +46,7 @@ class TestInputSensor:
         assert not hasattr(state, "key_buffer")
         assert not hasattr(state, "text")
 
+    @requires_display
     def test_start_stop(self):
         """Sensor should start and stop cleanly."""
         sensor = InputSensor()

@@ -8,7 +8,21 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-from pynput import keyboard, mouse
+# Lazy import pynput to allow tests to run in headless environments
+_pynput_available = False
+try:
+    from pynput import keyboard, mouse
+
+    _pynput_available = True
+except ImportError:
+    keyboard = None  # type: ignore
+    mouse = None  # type: ignore
+
+
+
+def is_pynput_available() -> bool:
+    """Check if pynput is available (requires display)."""
+    return _pynput_available
 
 
 @dataclass
@@ -46,8 +60,8 @@ class InputSensor:
     _baseline_samples: list = field(default_factory=list)
     _lock: threading.Lock = field(default_factory=threading.Lock)
     _running: bool = False
-    _keyboard_listener: keyboard.Listener | None = None
-    _mouse_listener: mouse.Listener | None = None
+    _keyboard_listener: keyboard.Listener | None = None  # type: ignore
+    _mouse_listener: mouse.Listener | None = None  # type: ignore
     _start_time: float = 0.0
 
     def __post_init__(self) -> None:
@@ -61,6 +75,10 @@ class InputSensor:
     def start(self) -> None:
         """Start monitoring keyboard and mouse."""
         if self._running:
+            return
+
+        if not _pynput_available:
+            print("⚠️ pynput not available (headless environment?)")
             return
 
         self._running = True
