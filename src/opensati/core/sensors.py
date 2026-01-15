@@ -81,18 +81,46 @@ class InputSensor:
             print("⚠️ pynput not available (headless environment?)")
             return
 
+        # macOS Safety Check: Prevent crash by checking permissions/API first
+        import platform
+        if platform.system() == "Darwin":
+            try:
+                from ApplicationServices import AXIsProcessTrusted
+                # This access triggers the KeyError if pyobjc is broken
+                # and returns False if permissions are missing
+                if not AXIsProcessTrusted():
+                    print("⚠️ Accessibility permissions missing for input monitoring.")
+                    print("   Continuing with sensors disabled (grant access in System Settings to enable).")
+                    self._running = True
+                    return
+            except Exception as e:
+                print(f"⚠️ macOS Input Check Failed: {e}")
+                print("   Disabling input sensors to prevent crash.")
+                self._running = True
+                return
+
         self._running = True
         self._start_time = time.time()
 
-        # Start keyboard listener (captures timing only, NOT keys)
-        self._keyboard_listener = keyboard.Listener(on_press=self._on_key_press)
-        self._keyboard_listener.start()
+        try:
+            # Start keyboard listener (captures timing only, NOT keys)
+            self._keyboard_listener = keyboard.Listener(on_press=self._on_key_press)
+            self._keyboard_listener.start()
 
-        # Start mouse listener
-        self._mouse_listener = mouse.Listener(
-            on_click=self._on_mouse_click, on_move=self._on_mouse_move
-        )
-        self._mouse_listener.start()
+            # Start mouse listener
+            self._mouse_listener = mouse.Listener(
+                on_click=self._on_mouse_click, on_move=self._on_mouse_move
+            )
+            self._mouse_listener.start()
+
+            print("🎹 Input sensors started (velocity only - no content logging)")
+            
+        except Exception as e:
+            print(f"⚠️ Input monitoring failed to start: {e}")
+            print("   (This is common on macOS if Permissions are missing or PyObjC versions conflict)")
+            print("   Continuing with input sensors disabled...")
+            self._keyboard_listener = None
+            self._mouse_listener = None
 
         print("🎹 Input sensors started (velocity only - no content logging)")
 
